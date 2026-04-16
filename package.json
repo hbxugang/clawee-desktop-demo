@@ -1,0 +1,12 @@
+{
+  "name": "clawee-desktop-demo",
+  "private": true,
+  "packageManager": "pnpm@10.32.1",
+  "scripts": {
+    "dev:web": "pnpm --dir apps/web dev",
+    "dev:gateway": "uv run --project apps/gateway --directory apps/gateway uvicorn app.main:app --host 127.0.0.1 --port 43121",
+    "desktop:dev": "pnpm --dir apps/desktop dev",
+    "desktop:build": "pnpm --dir apps/desktop build",
+    "desktop:package": "pnpm --dir apps/desktop package"
+  }
+}
