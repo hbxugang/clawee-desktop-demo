@@ -92,6 +92,17 @@ describe("desktop self-contained runtime", () => {
     expect(script).not.toContain(".sh");
   });
 
+  it("allows overriding the openclaw-demo checkout path for CI packaging", async () => {
+    const script = await fs.readFile(
+      new URL("../scripts/build-openclaw-demo.ts", import.meta.url),
+      "utf8",
+    );
+
+    expect(script).toContain("process.env.OPENCLAW_DEMO_ROOT");
+    expect(script).toContain('path.isAbsolute(configuredOpenclawRoot)');
+    expect(script).toContain("path.resolve(repoRoot, configuredOpenclawRoot)");
+  });
+
   it("bundles gateway binaries and data into the PyInstaller executable", async () => {
     const specSource = await fs.readFile(new URL("../../gateway/pyinstaller.spec", import.meta.url), "utf8");
 
