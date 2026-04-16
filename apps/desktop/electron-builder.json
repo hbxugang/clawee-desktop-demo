@@ -1,0 +1,26 @@
+{
+  "appId": "ai.krillin.clawee.desktop.demo",
+  "productName": "Clawee Desktop Demo",
+  "directories": {
+    "output": "out"
+  },
+  "files": ["package.json", "dist/electron/**/*"],
+  "extraResources": [
+    {
+      "from": "../../dist/desktop/openclaw-demo",
+      "to": "openclaw-demo"
+    },
+    {
+      "from": "../../dist/desktop/gateway",
+      "to": "gateway"
+    },
+    {
+      "from": "../../dist/desktop/web",
+      "to": "web"
+    }
+  ],
+  "mac": {
+    "target": ["dir"],
+    "identity": null
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "@clawee-desktop-demo/desktop",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "dist/electron/main.js",
+  "scripts": {
+    "dev": "tsx scripts/dev.ts",
+    "build": "tsx scripts/build-desktop.ts",
+    "build:electron": "pnpm exec esbuild electron/main.ts --bundle --platform=node --format=esm --outfile=dist/electron/main.js --external:electron",
+    "package": "node --import tsx scripts/package-desktop.ts",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.0",
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.12",
+    "esbuild": "^0.27.7",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
