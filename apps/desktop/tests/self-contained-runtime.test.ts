@@ -65,4 +65,46 @@ describe("desktop self-contained runtime", () => {
     expect(script).not.toContain("requirements.txt");
     expect(script).not.toContain('cp -R "$ROOT_DIR/apps/gateway/app"');
   });
+
+  it("wires dev.ts through an Electron runtime guard instead of pnpm exec electron", async () => {
+    const devSource = await fs.readFile(new URL("../scripts/dev.ts", import.meta.url), "utf8");
+
+    expect(devSource).toContain("ensureElectronExecutablePath");
+    expect(devSource).not.toContain('"pnpm", ["exec", "electron"');
+  });
+
+  it("copies the full Next standalone root so packaged web dependencies stay self-contained", async () => {
+    const script = await fs.readFile(new URL("../scripts/build-web.sh", import.meta.url), "utf8");
+
+    expect(script).toContain('STANDALONE_DIR="$ROOT_DIR/apps/web/.next/standalone"');
+    expect(script).toContain('mkdir -p "$OUT_DIR/apps/web/.next"');
+    expect(script).toContain('cp -R "$STANDALONE_DIR"/. "$OUT_DIR"/');
+    expect(script).toContain('cp -R "$ROOT_DIR/apps/web/.next/static" "$OUT_DIR/apps/web/.next/static"');
+    expect(script).toContain('require(path.join(__dirname, "apps", "web", "server.js"));');
+    expect(script).not.toContain('STANDALONE_DIR="$ROOT_DIR/apps/web/.next/standalone/apps/web"');
+    expect(script).not.toContain('require(path.join(__dirname, "server.js"));');
+  });
+
+  it("bundles gateway binaries and data into the PyInstaller executable", async () => {
+    const specSource = await fs.readFile(new URL("../../gateway/pyinstaller.spec", import.meta.url), "utf8");
+
+    expect(specSource).toContain("a.binaries");
+    expect(specSource).toContain("a.datas");
+  });
+
+  it("packages a gateway runner entrypoint instead of bare FastAPI app module", async () => {
+    const specSource = await fs.readFile(new URL("../../gateway/pyinstaller.spec", import.meta.url), "utf8");
+
+    expect(specSource).toContain('Analysis(["app/desktop_entry.py"]');
+    expect(specSource).not.toContain('Analysis(["app/main.py"]');
+  });
+
+  it("runs uvicorn with a directly imported gateway app object", async () => {
+    const entrySource = await fs.readFile(new URL("../../gateway/app/desktop_entry.py", import.meta.url), "utf8");
+
+    expect(entrySource).toContain("from app.main import app");
+    expect(entrySource).toContain("uvicorn.run(");
+    expect(entrySource).toContain("app,");
+    expect(entrySource).not.toContain('"app.main:app"');
+  });
 });
