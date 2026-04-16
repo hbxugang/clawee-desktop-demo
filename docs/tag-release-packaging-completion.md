@@ -48,8 +48,7 @@
 
 workflow 当前会在以下 runner 上并行打包：
 
-- `macos-13`
-- `macos-14`
+- `macos-latest`，分别执行 `macos-x64` 与 `macos-arm64` 两条矩阵
 - `windows-latest`
 - `ubuntu-latest`
 
