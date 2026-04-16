@@ -5,8 +5,11 @@ import { fileURLToPath } from "node:url";
 
 import { resolveDesktopPaths } from "./paths";
 import {
-  startProcess,
+  resolveGatewayExecutablePath,
+  resolveNodeRuntimeCommand,
   stopManagedProcesses,
+  startProcess,
+  startProcessSpec,
   type ManagedProcess,
   waitForPort,
   writeRuntimeConfig,
@@ -35,40 +38,15 @@ async function startGatewayProcess(
   runtimeConfigPath: string,
   gatewayPort: number,
 ) {
-  const binaryPath = path.join(gatewayDistRoot, "clawee-desktop-demo-gateway");
+  const binaryPath = resolveGatewayExecutablePath(gatewayDistRoot);
 
-  try {
-    await fs.access(binaryPath);
-    return startProcess(binaryPath, [], gatewayDistRoot, {
-      ...process.env,
-      CLAWEE_RUNTIME_CONFIG_PATH: runtimeConfigPath,
-      CLAWEE_GATEWAY_PORT: String(gatewayPort),
-    });
-  } catch {
-    return startProcess(
-      "uv",
-      [
-        "run",
-        "--with-requirements",
-        "requirements.txt",
-        "--no-project",
-        "python",
-        "-m",
-        "uvicorn",
-        "app.main:app",
-        "--host",
-        "127.0.0.1",
-        "--port",
-        String(gatewayPort),
-      ],
-      gatewayDistRoot,
-      {
-        ...process.env,
-        CLAWEE_RUNTIME_CONFIG_PATH: runtimeConfigPath,
-        CLAWEE_GATEWAY_PORT: String(gatewayPort),
-      },
-    );
-  }
+  await fs.access(binaryPath);
+
+  return startProcess(binaryPath, [], gatewayDistRoot, {
+    ...process.env,
+    CLAWEE_RUNTIME_CONFIG_PATH: runtimeConfigPath,
+    CLAWEE_GATEWAY_PORT: String(gatewayPort),
+  });
 }
 
 async function bootstrap() {
@@ -89,10 +67,17 @@ async function bootstrap() {
 
   trackProcess(
     "openclaw-demo",
-    startProcess("node", [path.join(paths.openclawDistRoot, "server.js")], paths.openclawDistRoot, {
-      ...process.env,
-      OPENCLAW_DEMO_PORT: String(openclawPort),
-    }),
+    startProcessSpec(
+      resolveNodeRuntimeCommand({
+        execPath: process.execPath,
+        scriptPath: path.join(paths.openclawDistRoot, "server.js"),
+        env: {
+          ...process.env,
+          OPENCLAW_DEMO_PORT: String(openclawPort),
+        },
+      }),
+      paths.openclawDistRoot,
+    ),
   );
   await waitForPort("127.0.0.1", openclawPort, 30000);
   await writeRuntimeConfig(paths.runtimeConfigPath, openclawBaseUrl);
@@ -105,12 +90,19 @@ async function bootstrap() {
 
   trackProcess(
     "web",
-    startProcess("node", [path.join(paths.webDistRoot, "server.cjs")], paths.webDistRoot, {
-      ...process.env,
-      PORT: String(webPort),
-      HOSTNAME: "127.0.0.1",
-      NEXT_PUBLIC_GATEWAY_BASE_URL: `http://127.0.0.1:${gatewayPort}`,
-    }),
+    startProcessSpec(
+      resolveNodeRuntimeCommand({
+        execPath: process.execPath,
+        scriptPath: path.join(paths.webDistRoot, "server.cjs"),
+        env: {
+          ...process.env,
+          PORT: String(webPort),
+          HOSTNAME: "127.0.0.1",
+          NEXT_PUBLIC_GATEWAY_BASE_URL: `http://127.0.0.1:${gatewayPort}`,
+        },
+      }),
+      paths.webDistRoot,
+    ),
   );
   await waitForPort("127.0.0.1", webPort, 30000);
 

@@ -8,6 +8,12 @@ export type ManagedProcess = {
   child: ChildProcess;
 };
 
+export type ProcessSpec = {
+  command: string;
+  args: string[];
+  env: NodeJS.ProcessEnv;
+};
+
 export function startProcess(
   command: string,
   args: string[],
@@ -15,6 +21,35 @@ export function startProcess(
   env: NodeJS.ProcessEnv,
 ) {
   return spawn(command, args, { cwd, env, stdio: "inherit" });
+}
+
+export function startProcessSpec(spec: ProcessSpec, cwd: string) {
+  return startProcess(spec.command, spec.args, cwd, spec.env);
+}
+
+export function resolveNodeRuntimeCommand(input: {
+  execPath: string;
+  scriptPath: string;
+  env: NodeJS.ProcessEnv;
+}): ProcessSpec {
+  return {
+    command: input.execPath,
+    args: [input.scriptPath],
+    env: {
+      ...input.env,
+      ELECTRON_RUN_AS_NODE: "1",
+    },
+  };
+}
+
+export function resolveGatewayExecutablePath(
+  gatewayDistRoot: string,
+  platform: NodeJS.Platform = process.platform,
+) {
+  const executableName =
+    platform === "win32" ? "clawee-desktop-demo-gateway.exe" : "clawee-desktop-demo-gateway";
+
+  return path.join(gatewayDistRoot, executableName);
 }
 
 export function stopManagedProcesses(processes: ManagedProcess[]) {
