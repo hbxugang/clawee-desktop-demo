@@ -13,4 +13,5 @@ uv export \
   --no-header \
   --no-emit-project \
   > "$OUT_DIR/requirements.txt"
+rm -f "$ROOT_DIR/apps/gateway/uv.lock"
 cp -R "$ROOT_DIR/apps/gateway/app" "$OUT_DIR/app"
