@@ -59,11 +59,11 @@ describe("desktop self-contained runtime", () => {
   });
 
   it("builds the gateway as a version-pinned executable artifact", async () => {
-    const script = await fs.readFile(new URL("../scripts/build-gateway.sh", import.meta.url), "utf8");
+    const script = await fs.readFile(new URL("../scripts/build-gateway.ts", import.meta.url), "utf8");
 
-    expect(script).toContain("--with pyinstaller==6.19.0");
+    expect(script).toContain('"--with"');
+    expect(script).toContain('"pyinstaller==6.19.0"');
     expect(script).not.toContain("requirements.txt");
-    expect(script).not.toContain('cp -R "$ROOT_DIR/apps/gateway/app"');
   });
 
   it("wires dev.ts through an Electron runtime guard instead of pnpm exec electron", async () => {
@@ -74,15 +74,22 @@ describe("desktop self-contained runtime", () => {
   });
 
   it("copies the full Next standalone root so packaged web dependencies stay self-contained", async () => {
-    const script = await fs.readFile(new URL("../scripts/build-web.sh", import.meta.url), "utf8");
+    const script = await fs.readFile(new URL("../scripts/build-web.ts", import.meta.url), "utf8");
 
-    expect(script).toContain('STANDALONE_DIR="$ROOT_DIR/apps/web/.next/standalone"');
-    expect(script).toContain('mkdir -p "$OUT_DIR/apps/web/.next"');
-    expect(script).toContain('cp -R "$STANDALONE_DIR"/. "$OUT_DIR"/');
-    expect(script).toContain('cp -R "$ROOT_DIR/apps/web/.next/static" "$OUT_DIR/apps/web/.next/static"');
+    expect(script).toContain('path.join(webRoot, ".next", "standalone")');
+    expect(script).toContain('path.join(outputRoot, "apps", "web", ".next")');
+    expect(script).toContain('await fs.cp(standaloneRoot, outputRoot, { recursive: true });');
+    expect(script).toContain('await fs.cp(staticRoot, path.join(outputRoot, "apps", "web", ".next", "static"), {');
     expect(script).toContain('require(path.join(__dirname, "apps", "web", "server.js"));');
-    expect(script).not.toContain('STANDALONE_DIR="$ROOT_DIR/apps/web/.next/standalone/apps/web"');
-    expect(script).not.toContain('require(path.join(__dirname, "server.js"));');
+  });
+
+  it("drives desktop build through Node scripts instead of zsh wrappers", async () => {
+    const script = await fs.readFile(new URL("../scripts/build-desktop.ts", import.meta.url), "utf8");
+
+    expect(script).toContain('"build:gateway"');
+    expect(script).toContain('"build:web"');
+    expect(script).not.toContain('"zsh"');
+    expect(script).not.toContain(".sh");
   });
 
   it("bundles gateway binaries and data into the PyInstaller executable", async () => {

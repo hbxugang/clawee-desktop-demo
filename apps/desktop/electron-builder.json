@@ -22,5 +22,11 @@
   "mac": {
     "target": ["dir"],
     "identity": null
+  },
+  "win": {
+    "target": ["dir"]
+  },
+  "linux": {
+    "target": ["dir"]
   }
 }

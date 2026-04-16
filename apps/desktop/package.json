@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "tsx scripts/dev.ts",
     "build": "tsx scripts/build-desktop.ts",
+    "build:gateway": "tsx scripts/build-gateway.ts",
+    "build:web": "tsx scripts/build-web.ts",
     "build:electron": "pnpm exec esbuild electron/main.ts --bundle --platform=node --format=esm --outfile=dist/electron/main.js --external:electron",
     "package": "node --import tsx scripts/package-desktop.ts",
     "test": "vitest run"

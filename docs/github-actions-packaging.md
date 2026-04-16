@@ -12,19 +12,17 @@
 ### 已经确认可用的部分
 
 - `clawee-desktop-demo/package.json` 已提供 `pnpm desktop:package`，实际会进入 `apps/desktop/package` 脚本。
-- `apps/desktop/scripts/package-desktop.ts` 当前会先跑 `pnpm run build`，再执行 `electron-builder --mac dir`。
+- `apps/desktop/scripts/package-desktop.ts` 当前会先跑 `pnpm run build`，再根据当前平台执行 `electron-builder --mac dir`、`--win dir` 或 `--linux dir`。
 - 本机已存在 `apps/desktop/out/mac/Clawee Desktop Demo.app`，说明当前 macOS 本地链路已经能产出 `.app` 目录包。
 - `apps/desktop/scripts/build-openclaw-demo.ts` 会到仓库同级的 `openclaw-demo` 目录执行 `npm run build`，然后把 `dist` 复制到 `clawee-desktop-demo/dist/desktop/openclaw-demo`。
-- `apps/desktop/scripts/build-gateway.sh` 现在依赖 `uv run --with pyinstaller==6.19.0 pyinstaller ...`，CI 必须同时具备 `uv`、Python 3.12 和 PyInstaller 运行环境。
-- `apps/desktop/scripts/build-web.sh` 依赖 `apps/web/.next/standalone` 与 `apps/web/.next/static`，因此 CI 不能只做普通 Next 构建，必须保证 `build:desktop` 产出符合 standalone 布局。
+- `apps/desktop/scripts/build-gateway.ts` 现在依赖 `uv run --with pyinstaller==6.19.0 pyinstaller ...`，CI 必须同时具备 `uv`、Python 3.12 和 PyInstaller 运行环境。
+- `apps/desktop/scripts/build-web.ts` 依赖 `apps/web/.next/standalone` 与 `apps/web/.next/static`，因此 CI 不能只做普通 Next 构建，必须保证 `build:desktop` 产出符合 standalone 布局。
 - `apps/desktop/electron-builder.json` 已声明 `extraResources`，会把 `openclaw-demo`、`gateway`、`web` 三段产物打进 Electron 资源目录。
 
 ### 当前不能直接照搬到跨平台 CI 的部分
 
-- `apps/desktop/scripts/build-desktop.ts` 仍然直接调用 `zsh scripts/build-gateway.sh` 和 `zsh scripts/build-web.sh`。
-  这在 `windows-latest` 上不能直接执行，必须先改成跨平台 Node 脚本，或者在 workflow 内按平台分支处理。
-- `apps/desktop/scripts/package-desktop.ts` 当前只写死了 `--mac dir`。
-  如果要进入 matrix，需要让它根据 runner 平台切换到 `--mac`、`--win`、`--linux`，并同步调整 `electron-builder.json` target。
+- `apps/desktop/scripts/build-desktop.ts` 现在已经通过 `pnpm run build:gateway` 和 `pnpm run build:web` 调用跨平台 Node 脚本。
+- `apps/desktop/scripts/package-desktop.ts` 现在会根据 runner 平台切换到 `--mac`、`--win`、`--linux`，`electron-builder.json` 也已经补齐三平台 `dir` target。
 - `gateway` 的真实可分发产物现在依赖本地 `pyinstaller.spec` 与运行时目录结构。
   在把这段固化进 CI 之前，需要先分别在 macOS、Windows、Linux 本地验证产物是否都能被 Electron 正常拉起。
 - `openclaw-demo` 是仓库中的独立子目录，但不在 `clawee-desktop-demo/pnpm-workspace.yaml` 里。
@@ -99,21 +97,20 @@ jobs:
 
 这部分是后续真正创建 workflow 时必须一起做的，不建议把上面的草图原样提交。
 
-### 1. 先把桌面打包脚本改成平台可切换
+### 1. 桌面打包脚本已经支持平台切换
 
-- `apps/desktop/scripts/package-desktop.ts` 需要从当前平台推导 `electron-builder` 参数。
-- 至少要支持：
-  - macOS: `--mac`
-  - Windows: `--win`
-  - Linux: `--linux`
-- `electron-builder.json` 也要从当前只声明 `mac.target = ["dir"]`，扩展为每个平台都有最小可工作的 target。
-- 第一阶段建议 target 保守一些，以“能在 CI 里稳定产物”为优先，不先追求安装包格式全覆盖。
+- `apps/desktop/scripts/package-desktop.ts` 已经从当前平台推导 `electron-builder` 参数。
+- 当前支持：
+  - macOS: `--mac dir`
+  - Windows: `--win dir`
+  - Linux: `--linux dir`
+- `electron-builder.json` 也已从只声明 `mac.target = ["dir"]` 扩展为三平台都有最小可工作的 `dir` target。
+- 第一阶段仍然保持 target 保守，以“能在 CI 里稳定产物”为优先，不先追求安装包格式全覆盖。
 
-### 2. 把 `zsh` 构建脚本替换成跨平台 Node 脚本
+### 2. `zsh` 构建脚本已经替换成跨平台 Node 脚本
 
-- `build-gateway.sh` 和 `build-web.sh` 现在只能稳定跑在 Unix runner。
-- 如果 workflow 要覆盖 `windows-latest`，应优先把这两段迁移成 Node/TypeScript 脚本，由 `build-desktop.ts` 统一调用。
-- 原因不是只有 shell 可用性：
+- `build-gateway.ts` 和 `build-web.ts` 已经替代原先的 shell 脚本，由 `build-desktop.ts` 统一调用。
+- 原因不只是 shell 可用性：
   - `cp -R`、here-doc、路径分隔符、可执行文件后缀这些点，Windows 上都需要显式处理。
   - 后续如果要根据平台拼 `pyinstaller` 或 Electron 输出目录，用 Node 更容易集中收口。
 
@@ -146,7 +143,7 @@ jobs:
 ## 建议的收口顺序
 
 1. 先改 `apps/desktop/scripts/package-desktop.ts` 和 `electron-builder.json`，让打包目标随平台切换。
-2. 再把 `build-gateway.sh`、`build-web.sh` 迁成跨平台脚本，并保持现有输出目录不变。
+2. `build-gateway.ts`、`build-web.ts` 已经迁成跨平台脚本，并保持现有输出目录不变。
 3. 分别在 macOS、Windows、Linux 本地验证 `pnpm desktop:package` 是否能完整串起 `openclaw-demo`、`gateway`、`web`、`desktop`。
 4. 本地三平台验证通过后，再创建 `.github/workflows/package-desktop-demo.yml`，基本按上面的 matrix 草案落地。
 5. artifact 稳定后，再单独补签名、release、tag 触发策略，不和首版打包验证混在一起。

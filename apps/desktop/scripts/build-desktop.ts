@@ -6,13 +6,14 @@ const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 
 for (const [command, args] of [
   ["pnpm", ["exec", "tsx", "scripts/build-openclaw-demo.ts"]],
-  ["zsh", ["scripts/build-gateway.sh"]],
-  ["zsh", ["scripts/build-web.sh"]],
+  ["pnpm", ["run", "build:gateway"]],
+  ["pnpm", ["run", "build:web"]],
   ["pnpm", ["run", "build:electron"]],
 ] as const) {
   const result = spawnSync(command, args, {
     cwd: desktopRoot,
     stdio: "inherit",
+    shell: process.platform === "win32",
   });
 
   if (result.status !== 0) {
