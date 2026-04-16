@@ -97,3 +97,31 @@ export async function waitForPort(host: string, port: number, timeoutMs: number)
 
   throw new Error(`port ${host}:${port} not ready`);
 }
+
+export async function waitForProcessReady(input: {
+  name: string;
+  child: ChildProcess;
+  host: string;
+  port: number;
+  timeoutMs: number;
+}) {
+  const processFailurePromise = new Promise<never>((_, reject) => {
+    input.child.once("exit", (code, signal) => {
+      reject(
+        new Error(
+          `${input.name} exited before ${input.host}:${input.port} became ready (code=${code}, signal=${signal})`,
+        ),
+      );
+    });
+
+    input.child.once("error", (error) => {
+      reject(
+        new Error(`${input.name} failed before ${input.host}:${input.port} became ready`, {
+          cause: error,
+        }),
+      );
+    });
+  });
+
+  await Promise.race([waitForPort(input.host, input.port, input.timeoutMs), processFailurePromise]);
+}

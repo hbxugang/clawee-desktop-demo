@@ -24,7 +24,7 @@
     "identity": null
   },
   "win": {
-    "target": ["dir"]
+    "target": ["portable"]
   },
   "linux": {
     "target": ["dir"]

@@ -17,12 +17,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest
-            asset_name: macos
+          - os: macos-13
+            asset_name: macos-x64
+            package_target: mac-x64
+          - os: macos-14
+            asset_name: macos-arm64
+            package_target: mac-arm64
           - os: windows-latest
-            asset_name: windows
+            asset_name: windows-portable
+            package_target: win-portable
           - os: ubuntu-latest
             asset_name: linux
+            package_target: linux-dir
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -68,6 +74,7 @@ jobs:
       - name: Package desktop demo
         env:
           OPENCLAW_DEMO_ROOT: openclaw-demo
+          CLAWEE_DESKTOP_PACKAGE_TARGET: ${{ matrix.package_target }}
         run: pnpm desktop:package
 
       - name: Archive packaged output
@@ -101,7 +108,7 @@ jobs:
       - name: Upload packaged artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: desktop-${{ matrix.os }}
+          name: desktop-${{ matrix.asset_name }}
           path: apps/desktop/out/**
           if-no-files-found: error
 

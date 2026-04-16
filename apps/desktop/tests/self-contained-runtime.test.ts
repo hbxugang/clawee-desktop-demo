@@ -53,9 +53,49 @@ describe("desktop self-contained runtime", () => {
     expect(mainSource).toContain('scriptPath: path.join(paths.openclawDistRoot, "server.js")');
     expect(mainSource).toContain('scriptPath: path.join(paths.webDistRoot, "server.cjs")');
     expect(mainSource).toContain("resolveGatewayExecutablePath(gatewayDistRoot)");
+    expect(mainSource).toContain('console.log("desktop bootstrap paths"');
     expect(mainSource).not.toContain('startProcess("node"');
     expect(mainSource).not.toContain('"uv"');
     expect(mainSource).not.toContain('"--with-requirements"');
+  });
+
+  it("configures builder targets for portable Windows and directory-based macOS", async () => {
+    const builderConfig = await fs.readFile(new URL("../electron-builder.json", import.meta.url), "utf8");
+
+    expect(builderConfig).toContain('"mac": {');
+    expect(builderConfig).toContain('"target": ["dir"]');
+    expect(builderConfig).toContain('"win": {');
+    expect(builderConfig).toContain('"target": ["portable"]');
+    expect(builderConfig).not.toContain('"win": {\n    "target": ["dir"]');
+  });
+
+  it("adds an early-exit readiness guard for packaged child processes", async () => {
+    const processManagerSource = await fs.readFile(
+      new URL("../electron/process-manager.ts", import.meta.url),
+      "utf8",
+    );
+
+    expect(processManagerSource).toContain("waitForProcessReady");
+    expect(processManagerSource).toContain('input.child.once("exit"');
+    expect(processManagerSource).toContain('input.child.once("error"');
+    expect(processManagerSource).toContain("exited before");
+  });
+
+  it("defines four release assets and per-job package target overrides in workflow", async () => {
+    const workflowSource = await fs.readFile(
+      new URL("../../../.github/workflows/package-desktop-demo.yml", import.meta.url),
+      "utf8",
+    );
+
+    expect(workflowSource).toContain("asset_name: macos-x64");
+    expect(workflowSource).toContain("asset_name: macos-arm64");
+    expect(workflowSource).toContain("asset_name: windows-portable");
+    expect(workflowSource).toContain("asset_name: linux");
+    expect(workflowSource).toContain("package_target: mac-x64");
+    expect(workflowSource).toContain("package_target: mac-arm64");
+    expect(workflowSource).toContain("package_target: win-portable");
+    expect(workflowSource).toContain("package_target: linux-dir");
+    expect(workflowSource).toContain("CLAWEE_DESKTOP_PACKAGE_TARGET: ${{ matrix.package_target }}");
   });
 
   it("builds the gateway as a version-pinned executable artifact", async () => {

@@ -12,6 +12,7 @@ import {
   startProcessSpec,
   type ManagedProcess,
   waitForPort,
+  waitForProcessReady,
   writeRuntimeConfig,
 } from "./process-manager";
 
@@ -65,7 +66,16 @@ async function bootstrap() {
   const webPort = Number(process.env.PORT || "43122");
   const openclawBaseUrl = `http://127.0.0.1:${openclawPort}`;
 
-  trackProcess(
+  console.log("desktop bootstrap paths", {
+    isPackaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+    openclawDistRoot: paths.openclawDistRoot,
+    gatewayDistRoot: paths.gatewayDistRoot,
+    webDistRoot: paths.webDistRoot,
+    runtimeConfigPath: paths.runtimeConfigPath,
+  });
+
+  const openclawChild = trackProcess(
     "openclaw-demo",
     startProcessSpec(
       resolveNodeRuntimeCommand({
@@ -79,16 +89,28 @@ async function bootstrap() {
       paths.openclawDistRoot,
     ),
   );
-  await waitForPort("127.0.0.1", openclawPort, 30000);
+  await waitForProcessReady({
+    name: "openclaw-demo",
+    child: openclawChild,
+    host: "127.0.0.1",
+    port: openclawPort,
+    timeoutMs: 30000,
+  });
   await writeRuntimeConfig(paths.runtimeConfigPath, openclawBaseUrl);
 
-  trackProcess(
+  const gatewayChild = trackProcess(
     "gateway",
     await startGatewayProcess(paths.gatewayDistRoot, paths.runtimeConfigPath, gatewayPort),
   );
-  await waitForPort("127.0.0.1", gatewayPort, 30000);
+  await waitForProcessReady({
+    name: "gateway",
+    child: gatewayChild,
+    host: "127.0.0.1",
+    port: gatewayPort,
+    timeoutMs: 30000,
+  });
 
-  trackProcess(
+  const webChild = trackProcess(
     "web",
     startProcessSpec(
       resolveNodeRuntimeCommand({
@@ -104,7 +126,13 @@ async function bootstrap() {
       paths.webDistRoot,
     ),
   );
-  await waitForPort("127.0.0.1", webPort, 30000);
+  await waitForProcessReady({
+    name: "web",
+    child: webChild,
+    host: "127.0.0.1",
+    port: webPort,
+    timeoutMs: 30000,
+  });
 
   const win = new BrowserWindow({ width: 1280, height: 900, show: false });
   await win.loadURL(`http://127.0.0.1:${webPort}`);

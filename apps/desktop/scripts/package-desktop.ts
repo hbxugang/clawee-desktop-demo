@@ -11,6 +11,11 @@ type Step = {
 };
 
 type SupportedPlatform = "darwin" | "win32" | "linux";
+type TargetSpec = {
+  key: string;
+  id: string;
+  args: string[];
+};
 
 const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -29,25 +34,55 @@ function run(step: Step, cwd: string) {
 
 export function resolvePackagePlatformOptions(platform: NodeJS.Platform): {
   builderFlag: "--mac" | "--win" | "--linux";
-  target: "dir";
+  targets: TargetSpec[];
 } {
   switch (platform as SupportedPlatform) {
     case "darwin":
-      return { builderFlag: "--mac", target: "dir" };
+      return {
+        builderFlag: "--mac",
+        targets: [
+          { key: "mac-x64", id: "package:mac:x64", args: ["dir", "--x64"] },
+          { key: "mac-arm64", id: "package:mac:arm64", args: ["dir", "--arm64"] },
+        ],
+      };
     case "win32":
-      return { builderFlag: "--win", target: "dir" };
+      return {
+        builderFlag: "--win",
+        targets: [{ key: "win-portable", id: "package:win:portable", args: ["portable"] }],
+      };
     case "linux":
-      return { builderFlag: "--linux", target: "dir" };
+      return { builderFlag: "--linux", targets: [{ key: "linux-dir", id: "package:linux:dir", args: ["dir"] }] };
     default:
       throw new Error(`unsupported desktop packaging platform: ${platform}`);
   }
+}
+
+function resolvePackageTargets(
+  env: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform,
+  targets: TargetSpec[],
+) {
+  const requestedTarget = env.CLAWEE_DESKTOP_PACKAGE_TARGET;
+
+  if (!requestedTarget) {
+    return targets;
+  }
+
+  const matchedTarget = targets.find((target) => target.key === requestedTarget);
+
+  if (!matchedTarget) {
+    throw new Error(`unsupported ${platform} package target override: ${requestedTarget}`);
+  }
+
+  return [matchedTarget];
 }
 
 export function createPackageSteps(
   env: NodeJS.ProcessEnv,
   platform: NodeJS.Platform = process.platform,
 ): Step[] {
-  const { builderFlag, target } = resolvePackagePlatformOptions(platform);
+  const { builderFlag, targets } = resolvePackagePlatformOptions(platform);
+  const resolvedTargets = resolvePackageTargets(env, platform, targets);
 
   return [
     {
@@ -56,16 +91,16 @@ export function createPackageSteps(
       command: "pnpm",
       args: ["run", "build"],
     },
-    {
-      id: "package",
-      title: `electron-builder ${builderFlag} ${target}`,
+    ...resolvedTargets.map((target) => ({
+      id: target.id,
+      title: `electron-builder ${builderFlag} ${target.args.join(" ")}`,
       command: "pnpm",
-      args: ["exec", "electron-builder", "--config", "electron-builder.json", builderFlag, target],
+      args: ["exec", "electron-builder", "--config", "electron-builder.json", builderFlag, ...target.args],
       env: {
         ...env,
         CSC_IDENTITY_AUTO_DISCOVERY: "false",
       },
-    },
+    })),
   ];
 }
 
