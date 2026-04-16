@@ -8,16 +8,21 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "v*"
 
 jobs:
   build:
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - macos-latest
-          - windows-latest
-          - ubuntu-latest
+        include:
+          - os: macos-latest
+            asset_name: macos
+          - os: windows-latest
+            asset_name: windows
+          - os: ubuntu-latest
+            asset_name: linux
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -65,9 +70,59 @@ jobs:
           OPENCLAW_DEMO_ROOT: openclaw-demo
         run: pnpm desktop:package
 
+      - name: Archive packaged output
+        env:
+          ASSET_NAME: ${{ matrix.asset_name }}
+        run: |
+          mkdir -p release-assets
+          python - <<'PY'
+          import os
+          import pathlib
+          import zipfile
+
+          source_root = pathlib.Path("apps/desktop/out")
+          asset_name = os.environ["ASSET_NAME"]
+          zip_path = pathlib.Path("release-assets") / f"clawee-desktop-demo-{asset_name}.zip"
+
+          with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+              for path in sorted(source_root.rglob("*")):
+                  if path.is_file():
+                      archive.write(path, path.relative_to(source_root))
+          print(f"Created {zip_path}")
+          PY
+
+      - name: Upload release zip artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.asset_name }}
+          path: release-assets/clawee-desktop-demo-${{ matrix.asset_name }}.zip
+          if-no-files-found: error
+
       - name: Upload packaged artifacts
         uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.os }}
           path: apps/desktop/out/**
           if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          pattern: release-*
+          merge-multiple: true
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          gh release view "$TAG_NAME" >/dev/null 2>&1 || gh release create "$TAG_NAME" --generate-notes
+          gh release upload "$TAG_NAME" release-assets/*.zip --clobber
